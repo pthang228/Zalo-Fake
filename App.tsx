@@ -73,6 +73,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
+        <Text style={styles.build}>build 4 · new-arch off</Text>
       </View>
     );
   }
@@ -143,4 +144,5 @@ export default function App() {
 const styles = StyleSheet.create({
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   logo: { fontSize: 36, fontWeight: '800', color: colors.primary },
+  build: { position: 'absolute', bottom: 40, fontSize: 12, color: colors.textMuted },
 });
