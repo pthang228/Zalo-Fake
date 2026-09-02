@@ -26,18 +26,25 @@ try {
   });
 } catch { /* */ }
 
-// BUILD 7 (BAN TRAN): KHONG nap App. Chi hien 1 man hinh don gian
-// bang RN core, de kiem tra native bridge co khoi dong duoc khong.
+let AppComp: React.ComponentType | null = null;
+let importError: any = null;
+try {
+  AppComp = require('./App').default;
+} catch (e) {
+  importError = e;
+}
+
 function Root() {
-  const [err, setErr] = React.useState<any>(capturedError);
-  React.useEffect(() => { notifyReact = (e) => setErr(e); return () => { notifyReact = null; }; }, []);
-  if (err) return <ErrorScreen where="runtime" err={err} />;
-  return (
-    <View style={{ flex: 1, backgroundColor: '#0a84ff', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800' }}>BUILD 7 OK</Text>
-      <Text style={{ color: '#fff', fontSize: 14, marginTop: 10 }}>ban tran chay duoc</Text>
-    </View>
-  );
+  const [err, setErr] = React.useState<any>(importError || capturedError);
+  React.useEffect(() => {
+    notifyReact = (e) => setErr(e);
+    if (capturedError && !err) setErr(capturedError);
+    return () => { notifyReact = null; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err) return <ErrorScreen where={importError ? 'import' : 'runtime'} err={err} />;
+  if (!AppComp) return <ErrorScreen where="import" err="App khong nap duoc" />;
+  const A = AppComp;
+  return <A />;
 }
 
 registerRootComponent(Root);

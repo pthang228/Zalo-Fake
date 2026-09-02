@@ -163,8 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // TAM TAT thong bao luc khoi dong de co lap loi crash (build 6).
-      // try { await setupNotifications(); } catch { /* */ }
+      try { await setupNotifications(); } catch { /* */ }
       try { setMuted(new Set(await storage.loadMuted())); } catch { /* */ }
       let saved: Settings | null = null;
       try { saved = await storage.loadSettings(); } catch { /* */ }

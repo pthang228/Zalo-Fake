@@ -73,7 +73,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.build}>build 6 · tat thong bao</Text>
+        <Text style={styles.build}>build 8 · fix ExpoAsset</Text>
       </View>
     );
   }
