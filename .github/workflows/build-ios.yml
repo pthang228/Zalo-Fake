@@ -20,7 +20,13 @@ jobs:
           node-version: 20
 
       - name: Cai dependencies
-        run: npm install
+        run: |
+          rm -f package-lock.json
+          npm install
+          echo "===== kiem tra plugin co mat khong ====="
+          for p in expo-notifications expo-image-picker expo-audio expo-video; do
+            if [ -d "node_modules/$p" ]; then echo "OK  $p"; else echo "THIEU  $p"; fi
+          done
 
       - name: Expo prebuild (tao thu muc ios)
         run: npx expo prebuild --platform ios --no-install
