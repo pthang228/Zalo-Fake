@@ -161,23 +161,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Khoi tao: tu dong ket noi backend mac dinh (khong con man Setup bat buoc)
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      await setupNotifications();
+      // TAM TAT thong bao luc khoi dong de co lap loi crash (build 6).
+      // try { await setupNotifications(); } catch { /* */ }
       try { setMuted(new Set(await storage.loadMuted())); } catch { /* */ }
-      const saved = await storage.loadSettings();
-      const active = await storage.loadActiveAccount();
-      if (active) setActiveAccountId(active);
+      let saved: Settings | null = null;
+      try { saved = await storage.loadSettings(); } catch { /* */ }
+      try { const active = await storage.loadActiveAccount(); if (active) setActiveAccountId(active); } catch { /* */ }
       // Dung setting da luu, neu chua co thi dung mac dinh nhung san trong code
       const s: Settings = saved || { baseUrl: DEFAULT_BACKEND_URL, token: DEFAULT_API_TOKEN };
       setSettings(s);
-      const client = new ApiClient(s.baseUrl, s.token);
-      apiRef.current = client;
-      setApi(client);
-      connectWs(s);
-      await refreshAccounts();
-      setReady(true);
+      try {
+        const client = new ApiClient(s.baseUrl, s.token);
+        apiRef.current = client;
+        setApi(client);
+        connectWs(s);
+        await refreshAccounts();
+      } catch { /* */ }
+      if (!cancelled) setReady(true);
     })();
-    return () => { wsRef.current?.close(); };
+    return () => { cancelled = true; wsRef.current?.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
