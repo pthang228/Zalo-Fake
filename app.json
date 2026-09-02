@@ -1,13 +1,32 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "ZaloFake",
+    "slug": "zalofake",
+    "scheme": "zalofake",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép ZaloFake truy cập ảnh/video để gửi trong hội thoại."
+        }
+      ],
+      "expo-audio",
+      "expo-video"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zalofake.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Cho phép ZaloFake dùng micro để ghi âm tin nhắn thoại.",
+        "NSPhotoLibraryUsageDescription": "Cho phép ZaloFake truy cập ảnh/video để gửi trong hội thoại.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
