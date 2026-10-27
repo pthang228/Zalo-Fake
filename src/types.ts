@@ -98,6 +98,18 @@ export interface Booking {
   evidence: BookingEvidence[];
 }
 
+export type PhoneSyncState =
+  | 'idle' | 'starting' | 'requesting' | 'waiting_phone' | 'downloading' | 'importing' | 'finishing'
+  | 'done' | 'error' | 'cancelled';
+
+export interface PhoneSyncStatus {
+  state: PhoneSyncState;
+  message: string;
+  startedAt?: number;
+  finishedAt?: number | null;
+  result?: { totals: { files: number; saved: number; skipped: number; failed: number } } | null;
+}
+
 export interface BookingReport {
   from: number;
   to: number;

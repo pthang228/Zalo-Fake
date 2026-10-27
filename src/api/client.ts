@@ -1,4 +1,4 @@
-import { Account, BookingReport, Call, Contact, Message, Thread } from '../types';
+import { Account, BookingReport, Call, Contact, Message, PhoneSyncStatus, Thread } from '../types';
 
 // REST client goi backend ZaloFake. Tao voi baseUrl + token.
 export class ApiClient {
@@ -63,6 +63,17 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ groupCount }),
     });
+  }
+
+  // --- dong bo tin nhan tu Zalo tren dien thoai (thu nghiem) ---
+  startPhoneSync(id: string) {
+    return this.req<PhoneSyncStatus>(`/accounts/${id}/sync-phone`, { method: 'POST' });
+  }
+  phoneSyncStatus(id: string) {
+    return this.req<PhoneSyncStatus>(`/accounts/${id}/sync-phone`);
+  }
+  cancelPhoneSync(id: string) {
+    return this.req<PhoneSyncStatus>(`/accounts/${id}/sync-phone`, { method: 'DELETE' });
   }
 
   // --- tong ket dat phong ---

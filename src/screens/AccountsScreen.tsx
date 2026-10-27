@@ -1,13 +1,74 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useApp } from '../state/AppContext';
 import { Avatar } from '../components/Avatar';
 import { colors } from '../theme';
-import { Account } from '../types';
+import { Account, PhoneSyncStatus } from '../types';
 
 export function AccountsScreen({ navigation }: any) {
   const { accounts, activeAccountId, setActiveAccount, refreshAccounts, api, disconnect, wsConnected } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+  const [phoneSync, setPhoneSync] = useState<Record<string, PhoneSyncStatus>>({});
+  const mounted = useRef(true);
+  const watching = useRef(new Set<string>()); // tai khoan dang theo doi trong phien nay -> moi bao ket qua
+  useEffect(() => () => { mounted.current = false; }, []);
+
+  const running = (s?: PhoneSyncStatus) => !!s && !['idle', 'done', 'error', 'cancelled'].includes(s.state);
+
+  // Hoi trang thai dong bo moi 2 giay cho den khi xong; xong thi bao ket qua 1 lan
+  const watchSync = useCallback(async (acc: Account) => {
+    watching.current.add(acc.id);
+    for (;;) {
+      let s: PhoneSyncStatus;
+      try { s = await api!.phoneSyncStatus(acc.id); } catch { return; }
+      if (!mounted.current) return;
+      setPhoneSync((p) => ({ ...p, [acc.id]: s }));
+      if (!running(s)) {
+        if (watching.current.delete(acc.id)) {
+          if (s.state === 'done') { Alert.alert('Đồng bộ xong', s.message); refreshAccounts(); }
+          else if (s.state === 'error') Alert.alert('Đồng bộ lỗi', s.message);
+        }
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }, [api, refreshAccounts]);
+
+  // Mo man hinh ma dang co lan dong bo chay nen -> tiep tuc theo doi
+  useEffect(() => {
+    if (!api) return;
+    accounts.forEach(async (a) => {
+      try {
+        const s = await api.phoneSyncStatus(a.id);
+        if (mounted.current && running(s) && !watching.current.has(a.id)) watchSync(a);
+      } catch { /* */ }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, accounts.length]);
+
+  const onPhoneSync = (acc: Account) => {
+    Alert.alert(
+      'Đồng bộ từ điện thoại',
+      'Zalo trên điện thoại sẽ hiện thông báo. Bạn mở Zalo và bấm "ĐỒNG BỘ NGAY" để gửi tin nhắn cũ sang đây.\n\nTài khoản sẽ tạm ngắt vài chục giây trong lúc đồng bộ.',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Bắt đầu',
+          onPress: async () => {
+            try {
+              const s = await api!.startPhoneSync(acc.id);
+              setPhoneSync((p) => ({ ...p, [acc.id]: s }));
+              watchSync(acc);
+            } catch (e: any) { Alert.alert('Không bắt đầu được', e.message); }
+          },
+        },
+      ],
+    );
+  };
+
+  const onCancelPhoneSync = async (acc: Account) => {
+    try { await api!.cancelPhoneSync(acc.id); } catch (e: any) { Alert.alert('Lỗi', e.message); }
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -46,9 +107,16 @@ export function AccountsScreen({ navigation }: any) {
             {active && <Text style={styles.activeTag}> · Dang chon</Text>}
           </View>
           {item.last_error ? <Text style={styles.err} numberOfLines={1}>{item.last_error}</Text> : null}
+          {running(phoneSync[item.id]) ? (
+            <View style={styles.syncRow}>
+              <Text style={styles.syncMsg} numberOfLines={3}>{phoneSync[item.id].message}</Text>
+              <TouchableOpacity onPress={() => onCancelPhoneSync(item)}><Text style={styles.syncCancel}>Huỷ</Text></TouchableOpacity>
+            </View>
+          ) : null}
         </View>
         <View style={styles.cardActions}>
           <TouchableOpacity onPress={() => onSync(item)} style={styles.iconBtn}><Text style={styles.iconTxt}>⟳</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => onPhoneSync(item)} disabled={running(phoneSync[item.id])} style={[styles.iconBtn, running(phoneSync[item.id]) && { opacity: 0.4 }]}><Text style={styles.iconTxt}>📲</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => onRemove(item)} style={styles.iconBtn}><Text style={[styles.iconTxt, { color: colors.danger }]}>⋯</Text></TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -101,6 +169,9 @@ const styles = StyleSheet.create({
   status: { fontSize: 13, color: colors.textMuted },
   activeTag: { fontSize: 13, color: colors.primary, fontWeight: '600' },
   err: { fontSize: 11, color: colors.danger, marginTop: 2 },
+  syncRow: { marginTop: 6, gap: 4 },
+  syncMsg: { fontSize: 12, color: colors.primary },
+  syncCancel: { fontSize: 12, color: colors.danger, fontWeight: '600' },
   cardActions: { flexDirection: 'row', gap: 4 },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   iconTxt: { fontSize: 20, color: colors.primary },
