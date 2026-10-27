@@ -63,6 +63,50 @@ export interface Call {
   ts: number;
 }
 
+// --- Tong ket dat phong (GET /api/report/bookings) ---
+export type BookingStatus = 'paid_full' | 'deposit_paid' | 'proof_sent' | 'unpaid';
+
+export interface BookingEvidence {
+  ts: number;
+  kind: 'confirm' | 'deposit_request' | 'deposit_ack' | 'full_ack' | 'customer_text' | 'customer_photo';
+  is_self: boolean;
+  text: string | null;
+  image: string | null;   // anh chuyen khoan cua khach
+  amount: number | null;  // VND
+}
+
+export interface Booking {
+  key: string;
+  account_id: string;
+  account_name: string | null;
+  thread_id: string;
+  customer_name: string | null;
+  customer_avatar: string | null;
+  room: string | null;
+  stay_date: string | null;   // YYYY-MM-DD
+  slot: string | null;
+  time_text: string | null;
+  price: number | null;
+  deposit_requested: number | null;
+  paid: number;
+  remaining: number | null;
+  status: BookingStatus;
+  status_label: string;
+  confirmed_at: number | null;
+  last_event_at: number;
+  received_in_range: number;
+  evidence: BookingEvidence[];
+}
+
+export interface BookingReport {
+  from: number;
+  to: number;
+  accounts: { id: string; name: string | null; online: boolean; data_from: number | null; data_to: number | null }[];
+  warnings: string[];
+  totals: { bookings: number; paid_full: number; deposit_paid: number; proof_sent: number; unpaid: number; revenue: number; received_in_range: number };
+  bookings: Booking[];
+}
+
 export type WsEvent =
   | { type: 'connected'; ts: number }
   | { type: 'message'; accountId: string; message: Message }

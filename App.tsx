@@ -17,6 +17,7 @@ import { ChatScreen } from './src/screens/ChatScreen';
 import { ForwardScreen } from './src/screens/ForwardScreen';
 import { ThreadInfoScreen } from './src/screens/ThreadInfoScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
+import { ReportScreen } from './src/screens/ReportScreen';
 import { makePlaceholder } from './src/screens/PlaceholderScreen';
 import { IncomingCallModal } from './src/components/IncomingCallModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -25,13 +26,12 @@ import { colors } from './src/theme';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const DiscoverScreen = makePlaceholder('Khám phá', 'compass');
 const TimelineScreen = makePlaceholder('Nhật ký', 'time');
 
 const ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Messages: ['chatbubble-ellipses', 'chatbubble-ellipses-outline'],
   Contacts: ['people', 'people-outline'],
-  Discover: ['compass', 'compass-outline'],
+  Report: ['receipt', 'receipt-outline'],
   Timeline: ['time', 'time-outline'],
   Profile: ['person', 'person-outline'],
 };
@@ -58,7 +58,7 @@ function MainTabs() {
         options={{ tabBarLabel: 'Tin nhắn', tabBarBadge: unreadTotal > 0 ? (unreadTotal > 99 ? '99+' : unreadTotal) : undefined }}
       />
       <Tab.Screen name="Contacts" component={ContactsScreen} options={{ tabBarLabel: 'Danh bạ' }} />
-      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: 'Khám phá' }} />
+      <Tab.Screen name="Report" component={ReportScreen} options={{ tabBarLabel: 'Tổng kết' }} />
       <Tab.Screen name="Timeline" component={TimelineScreen} options={{ tabBarLabel: 'Nhật ký' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Cá nhân' }} />
     </Tab.Navigator>
@@ -73,7 +73,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.build}>build 9 · cho phep HTTP</Text>
+        <Text style={styles.build}>build 10 · tong ket dat phong</Text>
       </View>
     );
   }

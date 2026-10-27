@@ -1,4 +1,4 @@
-import { Account, Call, Contact, Message, Thread } from '../types';
+import { Account, BookingReport, Call, Contact, Message, Thread } from '../types';
 
 // REST client goi backend ZaloFake. Tao voi baseUrl + token.
 export class ApiClient {
@@ -63,6 +63,12 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ groupCount }),
     });
+  }
+
+  // --- tong ket dat phong ---
+  bookingReport(from: number, to: number, accountIds?: string[]) {
+    const acc = accountIds?.length ? `&accounts=${accountIds.map(encodeURIComponent).join(',')}` : '';
+    return this.req<BookingReport>(`/report/bookings?from=${from}&to=${to}${acc}`);
   }
 
   // --- threads ---
