@@ -1,4 +1,5 @@
-// Cau hinh backend mac dinh - nhung san vao app de khoi phai nhap moi lan.
-// Doi IP o day neu may chay backend co IP khac (xem trong cua so backend / ipconfig).
-export const DEFAULT_BACKEND_URL = 'http://103.20.97.166:8080';
-export const DEFAULT_API_TOKEN = '6mtNPHjLQzS28vXyLUuItYknVZSuwWP9';
+// Cau hinh backend mac dinh. Backend chay tren dien thoai Android (Termux):
+// IP WiFi cua may Android; doi sang IP Tailscale (100.x.x.x) neu muon dung khi o xa.
+// Token KHONG de trong code (repo cong khai) - nhap 1 lan trong app: Ca nhan -> Doi dia chi backend.
+export const DEFAULT_BACKEND_URL = 'http://192.168.1.159:8080';
+export const DEFAULT_API_TOKEN = '';

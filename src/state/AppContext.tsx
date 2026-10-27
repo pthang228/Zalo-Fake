@@ -176,7 +176,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiRef.current = client;
         setApi(client);
         connectWs(s);
-        await refreshAccounts();
+        // Khong cho backend tra loi moi vao app: backend chet thi fetch treo ~1 phut
+        refreshAccounts();
       } catch { /* */ }
       if (!cancelled) setReady(true);
     })();
