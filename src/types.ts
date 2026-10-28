@@ -97,6 +97,7 @@ export interface Booking {
   received_in_range: number;
   evidence: BookingEvidence[];
   review?: string[];          // ly do "Can xem lai" (luat khong chac / AI doc khac)
+  thread_last_ts?: number;    // tin moi nhat cua hoi thoai (xep giong tab Tin nhan)
   ai?: { status: BookingStatus; status_label: string; price: number | null; confidence: string | null; evidence: string[]; note: string | null };
 }
 
@@ -106,6 +107,7 @@ export interface AiOnlyBooking {
   customer_name: string | null; customer_avatar: string | null;
   room: string | null; stay_date: string | null; time_text: string | null; price: number | null;
   status: BookingStatus; status_label: string; confidence: string | null; evidence: string[]; note: string | null; review: string[];
+  thread_last_ts?: number;
 }
 
 export interface AiReviewStatus {

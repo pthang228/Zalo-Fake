@@ -214,7 +214,10 @@ export function ReportScreen({ navigation }: any) {
   const list = useMemo(
     () => {
       const rows = (report?.bookings || []).filter((b) => filter === 'all' || (filter === 'review' ? !!b.review?.length : b.status === filter));
-      return filter === 'review' ? rows.concat((report?.ai_only || []).map(aiOnlyAsBooking)) : rows;
+      if (filter !== 'review') return rows; // backend da xep giong tab Tin nhan
+      // Gop don chi AI thay vao dung cho: hoi thoai co tin moi nhat len dau
+      return rows.concat((report?.ai_only || []).map(aiOnlyAsBooking))
+        .sort((x, y) => (y.thread_last_ts ?? 0) - (x.thread_last_ts ?? 0) || String(x.stay_date ?? '').localeCompare(String(y.stay_date ?? '')));
     },
     [report, filter]
   );
