@@ -27,7 +27,7 @@ export function ThreadsScreen({ navigation }: any) {
   useEffect(() => {
     const unsub = subscribe((ev) => {
       if (ev.type === 'connected') { load(); return; }
-      if ((ev.type === 'message' || ev.type === 'history_message' || ev.type === 'history_synced' || ev.type === 'contacts_synced')
+      if ((ev.type === 'message' || ev.type === 'history_message' || ev.type === 'deleted' || ev.type === 'history_synced' || ev.type === 'contacts_synced')
         && (!('accountId' in ev) || ev.accountId === activeAccount?.id)) {
         load();
       }

@@ -73,6 +73,19 @@ function FileIcon({ ext }: { ext: string }) {
   );
 }
 
+// Danh thiep (chat.recommended): ten, avatar, ma QR
+function contactCard(m: Message): { name: string; avatar: string | null; qr: string | null } | null {
+  if (!String(m.msg_type || '').includes('recommended') || !m.attachments) return null;
+  const a = m.attachments;
+  let d: any = {};
+  try { d = typeof a.description === 'string' ? JSON.parse(a.description) : (a.description || {}); } catch { /* */ }
+  const ok = (u: any) => (typeof u === 'string' && u.startsWith('http') ? u : null);
+  return { name: a.title || m.content || 'Danh thiếp', avatar: ok(a.thumb), qr: ok(d.qrCodeUrl) };
+}
+
+// Anh/video dong bo tu dien thoai nhung khong co link (Zalo dien thoai van xem duoc)
+const missingMedia = (m: Message) => !m.attachments && /^\[(Hình ảnh|Video)\]$/.test(String(m.content || '').trim());
+
 // Xac dinh media cua tin nhan
 function mediaOf(m: Message): {
   kind: 'image' | 'video' | 'sticker' | 'voice' | 'file' | null; display: string | null; play: string | null;
@@ -93,6 +106,7 @@ function mediaOf(m: Message): {
   const isFile = !isVideoFile && (t.includes('file') || (!!a && !!full && !isImage && !isVideo && !isVoice && !isSticker && (!!a.title || !!a.fileName || !!a.fileExt)));
 
   if (!a && !isVideo && !isImage && !isSticker && !isVoice) return { kind: null, display: null, play: null };
+  if (t.includes('recommended')) return { kind: null, display: null, play: null }; // danh thiep: ve rieng
 
   if (isSticker) return { kind: 'sticker', display: a ? pick(a.thumb, a.href, a.url) : null, play: null };
   if (isVoice) return { kind: 'voice', display: null, play: full };
@@ -190,6 +204,28 @@ export function MessageBubble({ message, showSender, showAvatar, showTime = true
         </Pressable>
       );
     }
+    const card = contactCard(message);
+    if (card) {
+      return (
+        <Pressable onLongPress={() => onLongPress?.(message)} style={styles.card}>
+          <View style={styles.cardTop}>
+            {card.avatar ? <Image source={{ uri: card.avatar }} style={styles.cardAvatar} /> : <Avatar uri={null} name={card.name} size={40} />}
+            <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+            {card.qr ? <Image source={{ uri: card.qr }} style={styles.cardQr} /> : null}
+          </View>
+          <Text style={styles.cardLabel}>Danh thiếp Zalo</Text>
+        </Pressable>
+      );
+    }
+    if (missingMedia(message)) {
+      const video = /Video/.test(String(message.content));
+      return (
+        <View style={[styles.missing, self ? styles.bubbleSelf : styles.bubbleOther]}>
+          <Ionicons name={video ? 'videocam-outline' : 'image-outline'} size={26} color={colors.textLight} />
+          <Text style={styles.missingText}>{video ? 'Video' : 'Hình ảnh'} chỉ xem được trên Zalo điện thoại</Text>
+        </View>
+      );
+    }
     // Tin chu: dai thi rut gon + "Xem them" nhu Zalo
     const content = message.content || '';
     const long = !expanded && content.length > LONG_TEXT;
@@ -263,6 +299,14 @@ const styles = StyleSheet.create({
   playOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   playCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   duration: { position: 'absolute', top: 8, left: 8, color: '#fff', fontSize: 12, fontWeight: '600', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
+  card: { width: 250, borderRadius: 14, overflow: 'hidden', backgroundColor: '#1E6BFF' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  cardAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff' },
+  cardName: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '600' },
+  cardQr: { width: 54, height: 54, borderRadius: 6, backgroundColor: '#fff' },
+  cardLabel: { backgroundColor: '#fff', color: colors.textMuted, fontSize: 13, paddingHorizontal: 12, paddingVertical: 8 },
+  missing: { width: 200, height: 120, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+  missingText: { fontSize: 12.5, color: colors.textMuted, textAlign: 'center' },
   viewerBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
   viewerImg: { width: '100%', height: '80%' },
   viewerClose: { position: 'absolute', top: 50, right: 20 },

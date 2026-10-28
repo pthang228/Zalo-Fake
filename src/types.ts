@@ -172,6 +172,7 @@ export type WsEvent =
   | { type: 'contacts_synced'; accountId: string; friends: number; groups: number }
   | { type: 'reaction'; accountId: string; msgId: string; reactions: Record<string, string[]> }
   | { type: 'recalled'; accountId: string; msgId: string }
+  | { type: 'deleted'; accountId: string; threadId: string; msgIds: string[] }
   | { type: 'typing'; accountId: string; threadId: string }
   | { type: 'seen'; accountId: string; threadId: string }
   | { type: 'delivered'; accountId: string; threadId: string };

@@ -111,6 +111,10 @@ export function ChatScreen({ route, navigation }: any) {
         }
       } else if (ev.type === 'reaction' && ev.accountId === activeAccount?.id) {
         setMessages((prev) => prev.map((m) => m.id === ev.msgId ? { ...m, reactions: ev.reactions } : m));
+      } else if (ev.type === 'deleted' && ev.accountId === activeAccount?.id) {
+        // Xoa tin phia minh (tu Zalo dien thoai/PC) -> go khoi man hinh nhu Zalo
+        const gone = new Set(ev.msgIds);
+        setMessages((prev) => prev.filter((m) => !gone.has(m.id)));
       } else if (ev.type === 'recalled' && ev.accountId === activeAccount?.id) {
         setMessages((prev) => prev.map((m) => m.id === ev.msgId ? { ...m, msg_type: 'recalled', content: 'Tin đã được thu hồi', attachments: null } : m));
       } else if (ev.type === 'typing' && ev.accountId === activeAccount?.id && ev.threadId === threadId) {
