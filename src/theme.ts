@@ -6,10 +6,12 @@ export const colors = {
 
   bg: '#FFFFFF',
   bgMuted: '#F4F5F7',
-  chatBg: '#E9EBEE',         // nen khung chat kieu Zalo
+  chatBg: '#E2E8F0',         // nen khung chat kieu Zalo (xam xanh nhat)
 
-  bubbleSelf: '#CFE7FF',     // bong bong tin cua minh (xanh nhat)
+  bubbleSelf: '#E3EFFF',     // bong bong tin cua minh (xanh nhat)
+  bubbleSelfBorder: '#C3D9F6',
   bubbleOther: '#FFFFFF',
+  bubbleOtherBorder: '#DDE2E8',
   bubbleText: '#1B1B1B',
 
   text: '#1B1B1B',

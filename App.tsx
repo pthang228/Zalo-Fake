@@ -15,6 +15,7 @@ import { ContactsScreen } from './src/screens/ContactsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { ForwardScreen } from './src/screens/ForwardScreen';
+import { ShortcutsScreen, ShortcutEditScreen } from './src/screens/ShortcutsScreen';
 import { ThreadInfoScreen } from './src/screens/ThreadInfoScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
@@ -73,7 +74,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.build}>build 16 · dung duoc khi khac mang</Text>
+        <Text style={styles.build}>build 17 · phim tat gui nhanh</Text>
       </View>
     );
   }
@@ -88,6 +89,16 @@ function RootNavigator() {
             name="Forward"
             component={ForwardScreen}
             options={{ presentation: 'modal', headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff' }}
+          />
+          <Stack.Screen
+            name="Shortcuts"
+            component={ShortcutsScreen}
+            options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff' }}
+          />
+          <Stack.Screen
+            name="ShortcutEdit"
+            component={ShortcutEditScreen}
+            options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff' }}
           />
           <Stack.Screen
             name="ThreadInfo"

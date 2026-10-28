@@ -20,17 +20,22 @@ function timeLabel(ts: number) {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
-export function ThreadItem({ thread, online, muted, onPress, onLongPress }: { thread: Thread; online?: boolean; muted?: boolean; onPress: () => void; onLongPress?: () => void }) {
+export function ThreadItem({ thread, online, muted, cloud, onPress, onLongPress }: { thread: Thread; online?: boolean; muted?: boolean; cloud?: boolean; onPress: () => void; onLongPress?: () => void }) {
   const hasUnread = thread.unread > 0 && !muted;
   return (
     <TouchableHighlight underlayColor={colors.separator} onPress={onPress} onLongPress={onLongPress}>
       <View style={styles.row}>
-        <Avatar uri={thread.avatar} name={thread.name || thread.id} size={54} online={online} showPresence={thread.type === 'user'} />
+        {cloud && !thread.avatar ? (
+          <View style={styles.cloudAvatar}><Ionicons name="cloud" size={28} color="#fff" /></View>
+        ) : (
+          <Avatar uri={thread.avatar} name={thread.name || thread.id} size={54} online={online} showPresence={thread.type === 'user' && !cloud} />
+        )}
         <View style={styles.middle}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, hasUnread && styles.nameUnread]} numberOfLines={1}>
               {thread.name || (thread.type === 'group' ? 'Nhóm' : thread.id)}
             </Text>
+            {cloud ? <Ionicons name="pin" size={13} color={colors.textLight} style={{ marginLeft: 4 }} /> : null}
             {muted ? <Ionicons name="notifications-off" size={14} color={colors.textLight} style={{ marginLeft: 4 }} /> : null}
           </View>
           <Text style={[styles.preview, hasUnread && styles.previewUnread]} numberOfLines={1}>
@@ -51,6 +56,7 @@ export function ThreadItem({ thread, online, muted, onPress, onLongPress }: { th
 }
 
 const styles = StyleSheet.create({
+  cloudAvatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: colors.bg },
   middle: { flex: 1, justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center' },

@@ -55,6 +55,23 @@ export interface Message {
   recalled?: boolean;
 }
 
+// Phim tat gui nhanh (anh+video phong, quy dinh, khuyen mai, bang gia, QR, dia chi)
+export interface ShortcutItem {
+  id: string;
+  kind: 'image' | 'video' | 'text' | 'file';
+  text?: string;
+  name?: string;
+  url?: string | null;
+  thumb?: string | null;
+  duration?: number;
+}
+export interface Shortcut {
+  id: string;
+  name: string;
+  category: string | null;
+  items: ShortcutItem[];
+}
+
 export interface Call {
   id: string;
   account_id: string;

@@ -10,12 +10,16 @@ import { Thread } from '../types';
 export function ThreadsScreen({ navigation }: any) {
   const { api, activeAccount, subscribe, isMuted } = useApp();
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [cloud, setCloud] = useState<Thread | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
-    if (!api || !activeAccount) { setThreads([]); return; }
-    try { setThreads(await api.listThreads(activeAccount.id)); } catch { /* */ }
+    if (!api || !activeAccount) { setThreads([]); setCloud(null); return; }
+    try {
+      const r = await api.listThreadsWithCloud(activeAccount.id);
+      setThreads(r.threads); setCloud(r.cloud);
+    } catch { /* */ }
   }, [api, activeAccount]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -38,11 +42,12 @@ export function ThreadsScreen({ navigation }: any) {
     setRefreshing(false);
   }, [api, activeAccount, load]);
 
+  // My Documents luon ghim dau danh sach (nhu Zalo)
   const filtered = useMemo(() => {
-    if (!query.trim()) return threads;
+    if (!query.trim()) return cloud ? [cloud, ...threads.filter((t) => t.id !== cloud.id)] : threads;
     const q = query.toLowerCase();
     return threads.filter((t) => (t.name || '').toLowerCase().includes(q) || (t.last_message || '').toLowerCase().includes(q));
-  }, [threads, query]);
+  }, [threads, query, cloud]);
 
   const onReadAll = useCallback(async () => {
     if (!api || !activeAccount) return;
@@ -81,6 +86,7 @@ export function ThreadsScreen({ navigation }: any) {
             <ThreadItem
               thread={item}
               muted={isMuted(item.id)}
+              cloud={item.id === cloud?.id}
               onPress={() => navigation.navigate('Chat', { threadId: item.id, threadType: item.type, name: item.name, avatar: item.avatar })}
               onLongPress={() => onLongPressThread(item)}
             />

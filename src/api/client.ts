@@ -1,4 +1,4 @@
-import { Account, BookingReport, Call, Contact, Message, PhoneSyncStatus, Thread } from '../types';
+import { Account, BookingReport, Call, Contact, Message, PhoneSyncStatus, Shortcut, Thread } from '../types';
 
 // REST client goi backend ZaloFake. Tao voi baseUrl + token.
 export class ApiClient {
@@ -84,8 +84,16 @@ export class ApiClient {
   }
 
   // --- threads ---
-  listThreads(accountId: string) {
-    return this.req<{ threads: Thread[] }>(`/accounts/${accountId}/threads`).then((r) => r.threads);
+  listThreads(accountId: string, limit?: number) {
+    return this.req<{ threads: Thread[] }>(`/accounts/${accountId}/threads${limit ? `?limit=${limit}` : ''}`).then((r) => r.threads);
+  }
+  // Danh sach + hoi thoai "My Documents" (backend tu tim, null neu chua co)
+  listThreadsWithCloud(accountId: string, limit?: number) {
+    return this.req<{ threads: Thread[]; cloud?: Thread | null }>(`/accounts/${accountId}/threads${limit ? `?limit=${limit}` : ''}`)
+      .then((r) => ({ threads: r.threads, cloud: r.cloud ?? null }));
+  }
+  getCloudThread(accountId: string) {
+    return this.listThreadsWithCloud(accountId, 1).then((r) => r.cloud);
   }
   markRead(accountId: string, threadId: string) {
     return this.req<{ ok: boolean }>(`/accounts/${accountId}/threads/${threadId}/read`, { method: 'POST' });
@@ -187,11 +195,48 @@ export class ApiClient {
     // Tin da gui se ve qua WebSocket (selfListen echo)
   }
 
-  forwardMessage(accountId: string, payload: { msgId?: string; text?: string; targets: { id: string; type: string }[] }) {
-    return this.req<{ ok: boolean; forwarded: number }>(`/accounts/${accountId}/forward`, {
+  forwardMessage(accountId: string, payload: { msgId?: string; msgIds?: string[]; text?: string; note?: string; targets: { id: string; type: string }[] }) {
+    return this.req<{ ok: boolean; forwarded: number; failed?: { id: string; error: string }[] }>(`/accounts/${accountId}/forward`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  // --- phim tat gui nhanh ---
+  listShortcuts() {
+    return this.req<{ shortcuts: Shortcut[] }>('/shortcuts').then((r) => r.shortcuts);
+  }
+  createShortcut(name: string, category?: string | null) {
+    return this.req<{ shortcut: Shortcut }>('/shortcuts', { method: 'POST', body: JSON.stringify({ name, category }) }).then((r) => r.shortcut);
+  }
+  updateShortcut(id: string, patch: { name?: string; category?: string | null; itemOrder?: string[] }) {
+    return this.req<{ shortcut: Shortcut }>(`/shortcuts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }).then((r) => r.shortcut);
+  }
+  reorderShortcuts(ids: string[]) {
+    return this.req<{ shortcuts: Shortcut[] }>('/shortcuts/order', { method: 'POST', body: JSON.stringify({ ids }) }).then((r) => r.shortcuts);
+  }
+  deleteShortcut(id: string) {
+    return this.req<{ ok: boolean }>(`/shortcuts/${id}`, { method: 'DELETE' });
+  }
+  addShortcutItems(id: string, payload: { accountId: string; msgIds?: string[]; text?: string }) {
+    return this.req<{ shortcut: Shortcut; added: number; skipped: number }>(`/shortcuts/${id}/items`, { method: 'POST', body: JSON.stringify(payload) });
+  }
+  // Tai 1 anh/video tu may vao phim tat (video kem anh bia de khach thay video, khong phai file)
+  async uploadShortcutItem(id: string, a: { uri: string; name: string; mime: string; kind: 'image' | 'video'; width?: number; height?: number; duration?: number; thumbUri?: string | null }) {
+    const form = new FormData();
+    form.append('file', { uri: a.uri, name: a.name, type: a.mime } as any);
+    if (a.thumbUri) form.append('thumb', { uri: a.thumbUri, name: 'thumb.jpg', type: 'image/jpeg' } as any);
+    form.append('kind', a.kind);
+    if (a.width) form.append('width', String(a.width));
+    if (a.height) form.append('height', String(a.height));
+    if (a.duration) form.append('duration', String(a.duration));
+    const res = await fetch(`${this.baseUrl}/api/shortcuts/${id}/upload`, { method: 'POST', headers: { Authorization: `Bearer ${this.token}` }, body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data.shortcut as Shortcut;
+  }
+  sendShortcut(accountId: string, id: string, dest: { threadId: string; threadType: string }) {
+    return this.req<{ ok: boolean; items: number }>(`/accounts/${accountId}/shortcuts/${id}/send`, { method: 'POST', body: JSON.stringify(dest) });
   }
 
   // --- calls ---
