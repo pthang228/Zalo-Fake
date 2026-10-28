@@ -73,7 +73,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.build}>build 12 · dong bo dien thoai</Text>
+        <Text style={styles.build}>build 13 · nut dong bo o tab Ca nhan</Text>
       </View>
     );
   }
