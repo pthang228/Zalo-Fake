@@ -77,9 +77,10 @@ export class ApiClient {
   }
 
   // --- tong ket dat phong ---
-  bookingReport(from: number, to: number, accountIds?: string[]) {
+  // ai=true: nho trinh doc AI tren may tinh doc lai (ket qua AI ve sau vai phut, goi lai de cap nhat)
+  bookingReport(from: number, to: number, accountIds?: string[], ai = false) {
     const acc = accountIds?.length ? `&accounts=${accountIds.map(encodeURIComponent).join(',')}` : '';
-    return this.req<BookingReport>(`/report/bookings?from=${from}&to=${to}${acc}`);
+    return this.req<BookingReport>(`/report/bookings?from=${from}&to=${to}${acc}${ai ? '&ai=1' : ''}`);
   }
 
   // --- threads ---

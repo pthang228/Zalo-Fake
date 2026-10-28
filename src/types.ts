@@ -96,6 +96,22 @@ export interface Booking {
   last_event_at: number;
   received_in_range: number;
   evidence: BookingEvidence[];
+  review?: string[];          // ly do "Can xem lai" (luat khong chac / AI doc khac)
+  ai?: { status: BookingStatus; status_label: string; price: number | null; confidence: string | null; evidence: string[]; note: string | null };
+}
+
+// Don chi AI thay (luat khong ra)
+export interface AiOnlyBooking {
+  key: string; account_id: string; account_name: string | null; thread_id: string;
+  customer_name: string | null; customer_avatar: string | null;
+  room: string | null; stay_date: string | null; time_text: string | null; price: number | null;
+  status: BookingStatus; status_label: string; confidence: string | null; evidence: string[]; note: string | null; review: string[];
+}
+
+export interface AiReviewStatus {
+  state: 'idle' | 'running' | 'done';
+  total: number; done: number; failed: number; error?: string | null;
+  startedAt?: number; finishedAt?: number | null; workerOnline: boolean;
 }
 
 export type PhoneSyncState =
@@ -115,8 +131,10 @@ export interface BookingReport {
   to: number;
   accounts: { id: string; name: string | null; online: boolean; data_from: number | null; data_to: number | null }[];
   warnings: string[];
-  totals: { bookings: number; paid_full: number; deposit_paid: number; proof_sent: number; unpaid: number; revenue: number; received_in_range: number };
+  totals: { bookings: number; paid_full: number; deposit_paid: number; proof_sent: number; unpaid: number; revenue: number; received_in_range: number; review?: number; ai_only?: number };
   bookings: Booking[];
+  ai_only?: AiOnlyBooking[];
+  ai?: AiReviewStatus;
 }
 
 export type WsEvent =

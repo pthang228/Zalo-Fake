@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,17 +8,20 @@ import { useApp } from '../state/AppContext';
 import { ZaloHeader } from '../components/ZaloHeader';
 import { Avatar } from '../components/Avatar';
 import { colors } from '../theme';
-import { Booking, BookingReport, BookingStatus } from '../types';
+import { AiOnlyBooking, AiReviewStatus, Booking, BookingReport, BookingStatus } from '../types';
 
 // Tong ket dat phong: khach da chot + da chuyen tien trong 1 khung gio, gop nhieu tai khoan.
 
-type Preset = 'today' | 'yesterday' | '7d' | 'custom';
-type Filter = 'all' | BookingStatus;
+type Preset = 'today' | 'yesterday' | '72h' | '7d' | 'custom';
+type Filter = 'all' | 'review' | BookingStatus;
+// Khung tuy chon: ngay (0h cua ngay) + phut trong ngay (0..1440; 1440 = 24:00 = het ngay)
+type Custom = { fromDay: number; fromMin: number; toDay: number; toMin: number };
 
 const DAY = 24 * 60 * 60 * 1000;
-const PRESETS: [Preset, string][] = [['today', 'Hôm nay'], ['yesterday', 'Hôm qua'], ['7d', '7 ngày'], ['custom', 'Tuỳ chọn']];
+const MIN = 60 * 1000;
+const PRESETS: [Preset, string][] = [['today', 'Hôm nay'], ['yesterday', 'Hôm qua'], ['72h', '72 giờ'], ['7d', '7 ngày'], ['custom', 'Tuỳ chọn']];
 const FILTERS: [Filter, string][] = [
-  ['all', 'Tất cả'], ['paid_full', 'Đã trả đủ'], ['deposit_paid', 'Đã cọc'], ['proof_sent', 'Chờ xác nhận'], ['unpaid', 'Chưa chuyển'],
+  ['all', 'Tất cả'], ['review', 'Cần xem lại'], ['paid_full', 'Đã trả đủ'], ['deposit_paid', 'Đã cọc'], ['proof_sent', 'Chờ xác nhận'], ['unpaid', 'Chưa chuyển'],
 ];
 const STATUS_COLOR: Record<BookingStatus, string> = {
   paid_full: '#2ECC71', deposit_paid: '#0068FF', proof_sent: '#F5A623', unpaid: '#E4483B',
@@ -30,17 +33,92 @@ const fmtDate = (ts: number) => { const d = new Date(ts); return `${pad(d.getDat
 const fmtTime = (ts: number) => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
 // toLocaleString khong on dinh tren Hermes -> tu chen dau cham
 const money = (n: number) => `${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
+// Don chi AI thay -> dang Booking de dung chung the hien thi
+const aiOnlyAsBooking = (a: AiOnlyBooking): Booking => ({
+  ...a, slot: null, deposit_requested: null, paid: 0, remaining: null, received_in_range: 0,
+  confirmed_at: null, last_event_at: 0,
+  evidence: a.evidence.map((text) => ({ ts: 0, kind: 'customer_text', is_self: false, text, image: null, amount: null })),
+});
+
+function aiLine(ai: AiReviewStatus | undefined, t: BookingReport['totals'] | undefined): string | null {
+  if (!ai || ai.state === 'idle') return null;
+  if (ai.state === 'running') {
+    return ai.workerOnline
+      ? `🤖 AI đang đọc lại ${ai.done}/${ai.total} cuộc trò chuyện… (tự cập nhật)`
+      : '🤖 Đang chờ máy tính chạy "Trình đọc AI" (chưa thấy máy tính kết nối).';
+  }
+  const at = ai.finishedAt ? new Date(ai.finishedAt) : null;
+  const when = at ? ` lúc ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '';
+  const extra = t?.ai_only ? ` · AI thấy thêm ${t.ai_only} đơn luật không thấy` : '';
+  const err = ai.failed ? ` · ${ai.failed} cuộc đọc lỗi (${ai.error || 'không rõ'})` : '';
+  return `🤖 AI đã đọc lại xong${when}${extra}${err}`;
+}
+
 const stayDate = (iso: string) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
 
-function rangeOf(preset: Preset, custom: { fromDay: number; fromHour: number; toDay: number; toHour: number }) {
+const fmtHm = (min: number) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
+const fmtFull = (ts: number) => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())} ${fmtDate(ts)}`; };
+
+// "7:30" | "0730" | "7h30" | "7" | "24" -> phut trong ngay; sai dinh dang -> null
+export function parseHm(s: string): number | null {
+  const m = /^\s*(\d{1,2})\s*(?:[:hH.]\s*(\d{1,2})?|(\d{2}))?\s*$/.exec(s);
+  if (!m) return null;
+  const h = Number(m[1]); const mm = Number(m[2] ?? m[3] ?? 0);
+  if (h > 24 || mm > 59 || (h === 24 && mm > 0)) return null;
+  return h * 60 + mm;
+}
+
+function rangeOf(preset: Preset, custom: Custom) {
   const now = Date.now();
   const today = startOfDay(now);
   switch (preset) {
     case 'yesterday': return { from: today - DAY, to: today - 1 };
+    case '72h': return { from: now - 3 * DAY, to: now };
     case '7d': return { from: today - 6 * DAY, to: now };
-    case 'custom': return { from: custom.fromDay + custom.fromHour * 3600000, to: custom.toDay + custom.toHour * 3600000 - 1 };
+    // "Den 13:15" tinh tron phut 13:15; "Den 24:00" = het ngay
+    case 'custom': return {
+      from: custom.fromDay + custom.fromMin * MIN,
+      to: custom.toMin >= 1440 ? custom.toDay + DAY - 1 : custom.toDay + custom.toMin * MIN + MIN - 1,
+    };
     default: return { from: today, to: now };
   }
+}
+
+// Khung dang xem -> gia tri ban dau cho "Tuy chon"
+function customFrom(range: { from: number; to: number }): Custom {
+  const fd = startOfDay(range.from); const td = startOfDay(range.to);
+  return {
+    fromDay: fd, fromMin: Math.floor((range.from - fd) / MIN),
+    toDay: td, toMin: Math.min(1440, Math.floor((range.to - td) / MIN)),
+  };
+}
+
+// O nhap gio HH:mm (go tu do, kiem tra khi roi o) + nut -/+ 15 phut
+function TimeField({ value, onChange }: { value: number; onChange: (min: number) => void }) {
+  const [text, setText] = useState(fmtHm(value));
+  useEffect(() => { setText(fmtHm(value)); }, [value]);
+  const commit = () => {
+    const v = parseHm(text);
+    if (v == null) setText(fmtHm(value)); else onChange(v);
+  };
+  const step = (d: number) => onChange(Math.min(1440, Math.max(0, value + d)));
+  return (
+    <View style={styles.stepper}>
+      <TouchableOpacity onPress={() => step(-15)} hitSlop={8}><Ionicons name="remove" size={18} color={colors.primary} /></TouchableOpacity>
+      <TextInput
+        style={styles.timeInput}
+        value={text}
+        onChangeText={setText}
+        onEndEditing={commit}
+        onSubmitEditing={commit}
+        keyboardType="numbers-and-punctuation"
+        returnKeyType="done"
+        maxLength={5}
+        selectTextOnFocus
+      />
+      <TouchableOpacity onPress={() => step(15)} hitSlop={8}><Ionicons name="add" size={18} color={colors.primary} /></TouchableOpacity>
+    </View>
+  );
 }
 
 function Stepper({ label, onPrev, onNext }: { label: string; onPrev: () => void; onNext: () => void }) {
@@ -66,7 +144,7 @@ export function ReportScreen({ navigation }: any) {
   const [selected, setSelected] = useState<string[]>([]);
   const [preset, setPreset] = useState<Preset>('today');
   const today = startOfDay(Date.now());
-  const [custom, setCustom] = useState({ fromDay: today, fromHour: 0, toDay: today, toHour: 24 });
+  const [custom, setCustom] = useState<Custom>({ fromDay: today, fromMin: 0, toDay: today, toMin: 1440 });
   const [report, setReport] = useState<BookingReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,13 +164,25 @@ export function ReportScreen({ navigation }: any) {
     setLoading(true);
     setError(null);
     try {
-      setReport(await api.bookingReport(from, to, selected));
+      lastRange.current = { from, to, selected };
+      setReport(await api.bookingReport(from, to, selected, true));
     } catch (e: any) {
       setError(e?.message || 'Không tải được báo cáo');
     } finally {
       setLoading(false);
     }
   }, [api, preset, custom, selected]);
+
+  // AI dang doc lai -> 15 giay lay lai bao cao 1 lan (chi ghep ket qua, khong xep viec moi)
+  const lastRange = useRef<{ from: number; to: number; selected: string[] } | null>(null);
+  useEffect(() => {
+    if (!api || report?.ai?.state !== 'running' || !lastRange.current) return;
+    const r = lastRange.current;
+    const timer = setTimeout(async () => {
+      try { if (lastRange.current === r) setReport(await api.bookingReport(r.from, r.to, r.selected)); } catch { /* thu lai lan sau */ }
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [api, report]);
 
   // Tu chay 1 lan khi vao man hinh
   const [autoRan, setAutoRan] = useState(false);
@@ -107,9 +197,14 @@ export function ReportScreen({ navigation }: any) {
     });
   };
 
-  const shiftDay = (key: 'fromDay' | 'toDay', d: number) => setCustom((c) => ({ ...c, [key]: c[key] + d * DAY }));
-  const shiftHour = (key: 'fromHour' | 'toHour', d: number) =>
-    setCustom((c) => ({ ...c, [key]: Math.min(24, Math.max(0, c[key] + d)) }));
+  const shiftDay = (key: 'fromDay' | 'toDay', d: number) => setCustom((c) => ({ ...c, [key]: startOfDay(c[key] + d * DAY + DAY / 2) }));
+  const setMin = (key: 'fromMin' | 'toMin', v: number) => setCustom((c) => ({ ...c, [key]: v }));
+  const pickPreset = (p: Preset) => {
+    // Chuyen sang "Tuy chon": dien san khung dang xem de chinh tiep
+    if (p === 'custom' && preset !== 'custom') setCustom(customFrom(rangeOf(preset, custom)));
+    setPreset(p);
+  };
+  const shown = rangeOf(preset, custom);
 
   const openChat = async (b: Booking) => {
     await setActiveAccount(b.account_id);
@@ -117,7 +212,10 @@ export function ReportScreen({ navigation }: any) {
   };
 
   const list = useMemo(
-    () => (report?.bookings || []).filter((b) => filter === 'all' || b.status === filter),
+    () => {
+      const rows = (report?.bookings || []).filter((b) => filter === 'all' || (filter === 'review' ? !!b.review?.length : b.status === filter));
+      return filter === 'review' ? rows.concat((report?.ai_only || []).map(aiOnlyAsBooking)) : rows;
+    },
     [report, filter]
   );
 
@@ -134,19 +232,21 @@ export function ReportScreen({ navigation }: any) {
 
         <Text style={styles.label}>Khung thời gian</Text>
         <View style={styles.chips}>
-          {PRESETS.map(([p, l]) => <Chip key={p} label={l} active={preset === p} onPress={() => setPreset(p)} />)}
+          {PRESETS.map(([p, l]) => <Chip key={p} label={l} active={preset === p} onPress={() => pickPreset(p)} />)}
         </View>
         {preset === 'custom' && (
           <View style={styles.custom}>
-            {([['Từ', 'fromDay', 'fromHour'], ['Đến', 'toDay', 'toHour']] as const).map(([l, dk, hk]) => (
+            {([['Từ', 'fromDay', 'fromMin'], ['Đến', 'toDay', 'toMin']] as const).map(([l, dk, mk]) => (
               <View key={l} style={styles.customRow}>
                 <Text style={styles.customLabel}>{l}</Text>
                 <Stepper label={fmtDate(custom[dk])} onPrev={() => shiftDay(dk, -1)} onNext={() => shiftDay(dk, 1)} />
-                <Stepper label={`${pad(custom[hk])}:00`} onPrev={() => shiftHour(hk, -1)} onNext={() => shiftHour(hk, 1)} />
+                <TimeField value={custom[mk]} onChange={(v) => setMin(mk, v)} />
               </View>
             ))}
+            <Text style={styles.customHint}>Gõ giờ dạng 7:30, 0730 hoặc 7h30. "Đến 24:00" là hết ngày.</Text>
           </View>
         )}
+        <Text style={styles.rangeText}>{fmtFull(shown.from)}  →  {fmtFull(shown.to)}</Text>
 
         <TouchableOpacity style={[styles.runBtn, loading && { opacity: 0.6 }]} onPress={run} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.runText}>Tổng kết</Text>}
@@ -162,8 +262,9 @@ export function ReportScreen({ navigation }: any) {
             <View style={styles.card}><Text style={styles.cardNum}>{money(t.revenue)}</Text><Text style={styles.cardLabel}>Tổng giá trị</Text></View>
           </View>
           <Text style={styles.counts}>
-            Đã trả đủ {t.paid_full} · Đã cọc {t.deposit_paid} · Gửi ảnh, chưa xác nhận {t.proof_sent} · Chưa chuyển {t.unpaid}
+            Đã trả đủ {t.paid_full} · Đã cọc {t.deposit_paid} · Gửi ảnh, chưa xác nhận {t.proof_sent} · Chưa chuyển {t.unpaid}{t.review || t.ai_only ? ` · Cần xem lại ${(t.review || 0) + (t.ai_only || 0)}` : ''}
           </Text>
+          {!!aiLine(report?.ai, t) && <Text style={styles.aiLine}>{aiLine(report?.ai, t)}</Text>}
         </View>
       )}
 
@@ -200,6 +301,7 @@ export function ReportScreen({ navigation }: any) {
             <View style={[styles.badge, { backgroundColor: STATUS_COLOR[b.status] }]}>
               <Text style={styles.badgeText}>{b.status_label}</Text>
             </View>
+            {!!b.review?.length && <Text style={styles.reviewText}>⚠ Cần xem lại: {b.review.join('; ')}</Text>}
           </View>
           <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
         </Pressable>
@@ -208,7 +310,7 @@ export function ReportScreen({ navigation }: any) {
           <View style={styles.evidence}>
             {b.evidence.map((e, i) => (
               <View key={i} style={styles.evRow}>
-                <Text style={styles.evMeta}>{fmtTime(e.ts)} · {e.is_self ? 'Bạn' : 'Khách'}</Text>
+                {e.ts > 0 && <Text style={styles.evMeta}>{fmtTime(e.ts)} · {e.is_self ? 'Bạn' : 'Khách'}</Text>}
                 {!!e.text && <Text style={styles.evText}>{e.text}</Text>}
                 {!!e.image && (
                   <Pressable onPress={() => setViewer(e.image)}>
@@ -217,6 +319,15 @@ export function ReportScreen({ navigation }: any) {
                 )}
               </View>
             ))}
+            {!!b.ai && (
+              <View style={styles.aiBox}>
+                <Text style={styles.aiTitle}>
+                  🤖 AI đọc: {b.ai.status_label}{b.ai.price != null ? ` · giá ${money(b.ai.price)}` : ''}{b.ai.confidence ? ` · tin cậy ${b.ai.confidence}` : ''}
+                </Text>
+                {b.ai.evidence.map((x, i) => <Text key={i} style={styles.aiEv}>{x}</Text>)}
+                {!!b.ai.note && <Text style={styles.aiEv}>Ghi chú: {b.ai.note}</Text>}
+              </View>
+            )}
             <TouchableOpacity style={styles.chatBtn} onPress={() => openChat(b)}>
               <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.primary} />
               <Text style={styles.chatText}>Mở chat</Text>
@@ -263,6 +374,14 @@ const styles = StyleSheet.create({
   customLabel: { width: 32, color: colors.text, fontWeight: '600' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4 },
   stepperText: { fontSize: 15, color: colors.text, minWidth: 44, textAlign: 'center' },
+  timeInput: { fontSize: 15, color: colors.text, minWidth: 48, textAlign: 'center', paddingVertical: 2 },
+  customHint: { fontSize: 12, color: colors.textMuted },
+  reviewText: { fontSize: 12, color: '#B26A00', marginTop: 6, lineHeight: 17 },
+  aiLine: { fontSize: 13, color: colors.primary, marginTop: 8, lineHeight: 18 },
+  aiBox: { backgroundColor: colors.bgMuted, borderRadius: 8, padding: 10, marginBottom: 8, gap: 3 },
+  aiTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
+  aiEv: { fontSize: 12, color: colors.textMuted, lineHeight: 17 },
+  rangeText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   runBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
   runText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   error: { color: colors.danger, marginTop: 8 },
