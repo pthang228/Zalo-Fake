@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { AppState as RNAppState } from 'react-native';
 import { ApiClient } from '../api/client';
 import { WsManager } from '../api/ws';
 import { Account, Call, Settings, WsEvent } from '../types';
 import * as storage from './storage';
 import { notifyCall, notifyMessage, setupNotifications } from '../notify';
 import { DEFAULT_BACKEND_URL, DEFAULT_API_TOKEN } from '../appConfig';
+import { resolveBackend, withEnteredUrl } from './endpoint';
 
 interface AppState {
   ready: boolean;                 // da load xong settings tu storage chua
@@ -130,7 +132,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     wsRef.current = ws;
   }, [handleWsEvent]);
 
-  const configure = useCallback(async (s: Settings) => {
+  // Dung 1 bo setting: tao lai API client + WebSocket
+  const settingsRef = useRef<Settings | null>(null);
+  const apply = useCallback((s: Settings) => {
+    settingsRef.current = s;
+    setSettings(s);
+    const client = new ApiClient(s.baseUrl, s.token);
+    apiRef.current = client;
+    setApi(client);
+    connectWs(s);
+    refreshAccounts();
+  }, [connectWs, refreshAccounts]);
+
+  // Chon lai Wi-Fi / tunnel (chay nen, khong chan app). Doi dia chi thi ket noi lai.
+  const reResolve = useCallback(async () => {
+    const cur = settingsRef.current;
+    if (!cur) return;
+    try {
+      const next = await resolveBackend(cur);
+      await storage.saveSettings(next);
+      if (next.baseUrl !== settingsRef.current?.baseUrl) apply(next);
+      else { settingsRef.current = next; setSettings(next); }
+    } catch { /* giu nguyen */ }
+  }, [apply]);
+
+  const configure = useCallback(async (entered: Settings) => {
+    const s = withEnteredUrl({ ...settingsRef.current, ...entered });
+    settingsRef.current = s;
     await storage.saveSettings(s);
     setSettings(s);
     const client = new ApiClient(s.baseUrl, s.token);
@@ -144,6 +172,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const disconnect = useCallback(async () => {
     await storage.clearSettings();
     const s: Settings = { baseUrl: DEFAULT_BACKEND_URL, token: DEFAULT_API_TOKEN };
+    settingsRef.current = s;
     setSettings(s);
     const client = new ApiClient(s.baseUrl, s.token);
     apiRef.current = client;
@@ -170,6 +199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try { const active = await storage.loadActiveAccount(); if (active) setActiveAccountId(active); } catch { /* */ }
       // Dung setting da luu, neu chua co thi dung mac dinh nhung san trong code
       const s: Settings = saved || { baseUrl: DEFAULT_BACKEND_URL, token: DEFAULT_API_TOKEN };
+      settingsRef.current = s;
       setSettings(s);
       try {
         const client = new ApiClient(s.baseUrl, s.token);
@@ -180,10 +210,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshAccounts();
       } catch { /* */ }
       if (!cancelled) setReady(true);
+      reResolve(); // chay nen: o nha -> Wi-Fi, ra ngoai -> tunnel
     })();
     return () => { cancelled = true; wsRef.current?.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Quay lai app (co the da doi mang) -> chon lai dia chi
+  useEffect(() => {
+    const sub = RNAppState.addEventListener('change', (st) => { if (st === 'active') reResolve(); });
+    return () => sub.remove();
+  }, [reResolve]);
 
   const activeAccount = useMemo(
     () => accounts.find((a) => a.id === activeAccountId) || null,

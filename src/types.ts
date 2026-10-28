@@ -1,8 +1,11 @@
 // Kieu du lieu khop voi backend ZaloFake
 
 export interface Settings {
-  baseUrl: string; // vd http://192.168.1.10:8080
+  baseUrl: string; // dia chi dang dung, vd http://192.168.1.10:8080
   token: string;
+  lanUrl?: string;     // dia chi trong nha (chung Wi-Fi)
+  tunnelUrl?: string;  // dia chi Cloudflare Tunnel (https://…trycloudflare.com), tu cap nhat
+  beacon?: string;     // kenh ntfy.sh noi backend dang dia chi tunnel moi (hoc tu backend khi o nha)
 }
 
 export interface Account {
