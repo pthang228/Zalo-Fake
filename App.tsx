@@ -74,7 +74,7 @@ function RootNavigator() {
       <View style={styles.splash}>
         <Text style={styles.logo}>ZaloFake</Text>
         <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.build}>build 18 · khop My Documents voi Zalo</Text>
+        <Text style={styles.build}>build 19 · tu tim lai IP Wi-Fi</Text>
       </View>
     );
   }
